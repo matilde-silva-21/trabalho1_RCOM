@@ -23,10 +23,69 @@
 
 volatile int STOP = FALSE;
 
+enum STATE {
+    STATE0,
+    STATE1,
+    STATE2,
+    STATE3, 
+    STATE4       
+} typedef STATE;
+
+/**
+ * Extracts a selection of string and return a new string or NULL.
+ * It supports both negative and positive indexes.
+ */
+char *str_slice(char str[], int slice_from, int slice_to)
+{
+    // if a string is empty, returns nothing
+    if (str[0] == '\0')
+        return NULL;
+
+    char *buffer;
+    size_t str_len, buffer_len;
+
+    // for negative indexes "slice_from" must be less "slice_to"
+    if (slice_to < 0 && slice_from < slice_to) {
+        str_len = strlen(str);
+
+        // if "slice_to" goes beyond permissible limits
+        if (abs(slice_to) > str_len - 1)
+            return NULL;
+
+        // if "slice_from" goes beyond permissible limits
+        if (abs(slice_from) > str_len)
+            slice_from = (-1) * str_len;
+
+        buffer_len = slice_to - slice_from;
+        str += (str_len + slice_from);
+
+    // for positive indexes "slice_from" must be more "slice_to"
+    } else if (slice_from >= 0 && slice_to > slice_from) {
+        str_len = strlen(str);
+
+        // if "slice_from" goes beyond permissible limits
+        if (slice_from > str_len - 1)
+            return NULL;
+
+        buffer_len = slice_to - slice_from;
+        str += slice_from;
+
+    // otherwise, returns NULL
+    } else
+        return NULL;
+
+    buffer = calloc(buffer_len, sizeof(char));
+    strncpy(buffer, str, buffer_len);
+    return buffer;
+}
+
+
 int main(int argc, char *argv[])
 {
     // Program usage: Uses either COM1 or COM2
     const char *serialPortName = argv[1];
+
+    
 
     if (argc < 2)
     {
@@ -89,15 +148,70 @@ int main(int argc, char *argv[])
     printf("New termios structure set\n");
 
     // Loop for input
-    unsigned char buf[BUF_SIZE + 1] = {0}; // +1: Save space for the final '\0' char
+    unsigned char buf[BUF_SIZE + 1] = {0}, lastByte[BUF_SIZE+1]={0}, word[42], ADDRESS, CONTROL, BCC; // +1: Save space for the final '\0' char
 
+    STATE st = STATE0;
+    int byteCounter = 0;
+    
     while (STOP == FALSE)
     {
-        // Returns after 5 chars have been input
         int bytes = read(fd, buf, BUF_SIZE+1);
-        printf(":%s:%d\n", buf, bytes);
-        if(buf[strlen(buf)]=='\0'){
-            STOP = TRUE;        
+        switch (st)
+        {
+        case STATE0:
+            if(buf==0x7E){
+                st = STATE1;
+                byteCounter++;
+                strcpy(lastByte, buf);
+                strncat(word, lastByte, bytes);
+            }
+            break;
+
+        case STATE1:
+            if(buf!=0x7E){
+                byteCounter++;
+                st=STATE2;
+                strcpy(lastByte, buf);
+                strncat(word, lastByte, bytes);
+                if(byteCounter == 2) strcpy(ADDRESS, lastByte);
+            }
+            break;
+
+        case STATE2:
+            if(buf==0x7E){
+                st = STATE3;
+            }
+            byteCounter++;
+            strcpy(lastByte, buf);
+            strncat(word, lastByte, bytes);
+            if(byteCounter==3) strcpy(CONTROL, lastByte);
+            else if(byteCounter==4) strcpy(BCC, lastByte);
+            break;
+        case STATE3:
+            if(byteCounter > 5 || ((ADDRESS^CONTROL) != (BCC))){
+                st=STATE0;
+                memset(word,0,sizeof(word));
+                memset(buf,0,sizeof(buf));
+                memset(lastByte,0,sizeof(lastByte));
+            }
+            else{
+                st=STATE4;
+            }
+            break;
+        case STATE4:
+            if(CONTROL!=0X03){
+                st=STATE0;
+            }
+            else{
+                //TO DO: ALARME
+                
+                //send UA
+                int bytes = write(fd, word, strlen(word)+1);
+                STOP = TRUE;
+            }
+            break;
+        default:
+            break;
         }
     }
 
