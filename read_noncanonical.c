@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 // Baudrate settings are defined in <asm/termbits.h>, which is
 // included by <termios.h>
@@ -23,12 +24,12 @@
 
 volatile int STOP = FALSE;
 
-enum STATE {
+enum state {
     STATE0,
     STATE1,
     STATE2,
     STATE3, 
-    STATE4 ,
+    STATE4,
     STATE5      
 } typedef STATE;
 
@@ -104,73 +105,89 @@ int main(int argc, char *argv[])
 
     printf("New termios structure set\n");
 
-    // Loop for input
-    unsigned char* buf, ADDRESS, CONTROL, BCC; // +1: Save space for the final '\0' char
-    char* word;
+    
+    unsigned char buf[2] = {0}, parcels[5] = {0}; // +1: Save space for the final '\0' char
 
     STATE st = STATE0;
+    bool readByte = true;
 
-    
+    // Loop for input
     while (STOP == FALSE)
-    {
-        int bytes = read(fd, buf, 1); //ler byte a byte
-        if(bytes==0) continue;
-
-        printf("buf: %x\n", buf);
+    { 
+        if(readByte){
+            int bytes = read(fd, buf, 1); //ler byte a byte
+            if(bytes==0) continue;
+        }
+       
         
         switch (st)
         {
         case STATE0:
-            if(buf == '\x7E'){
+            if(buf[0] == 0x7E){
                 st = STATE1;
-                //strcat(word, buf);
+                parcels[0] = buf[0];
+                printf("flag 1 received\n");
             }
             break;
 
         case STATE1:
-            if(buf == '\x7E'){
-                strcpy(ADDRESS, buf);
+            if(buf[0] != 0x7E){
                 st = STATE2;
-                //strcat(word, buf);
-                printf("adress received:%s\n",buf);
+                parcels[1] = buf[0];
+                printf("address received\n");
             }
-            else {st = STATE0;}
+            else {
+                st = STATE0;
+                memset(parcels, 0, 5);
+            }
             break;
 
         case STATE2:
-            if(buf == '\x7E'){
-                //strcpy(CONTROL, buf);
+            if(buf[0] != 0x7E){
                 st = STATE3;
-                //strcat(word, buf);
-                printf("control received:%s\n",buf);
+                parcels[2] = buf[0];
+                printf("control received\n");
             }
-            else {st = STATE0;}
+            else {
+                st = STATE0;
+                memset(parcels, 0, 5);
+            }
             break;
 
         case STATE3:
-            if(buf == '\x7E'){
-                //strcpy(BCC, buf);
+            if(buf[0] != 0x7E){
+                parcels[3] = buf[0];
                 st = STATE4;
-                //strcat(word, buf);
-                printf("bcc received:%s\n",buf);
+                printf("bcc received\n");
             }
-            else {st = STATE0;}
+            else {
+                st = STATE0;
+                memset(parcels, 0, 5);
+            }
             break;
 
         case STATE4:
-            if(buf == '\x7E'){
+            if(buf[0] == 0x7E){
+                parcels[4] = buf[0];
                 st = STATE5;
-                //strcat(word, buf);
-                printf("flag received 2\n");
+                readByte = false;
+                printf("flag 2 received\n");
             }
 
-            else {st = STATE0;}
+            else {
+                st = STATE0;
+                memset(parcels, 0, 5);
+            }
             break;
         case STATE5:
-            /*if((ADDRESS^CONTROL)==BCC){
+            if(((parcels[1])^(parcels[2]))==(parcels[3])){
+                printf("\ngreat success! no error during transmission\n\n");
                 STOP = TRUE;
             }
-            else {st = STATE0;}*/
+            else {
+                st = STATE0;
+                memset(parcels, 0, 5);
+            }
             break;
         default:
             break;
