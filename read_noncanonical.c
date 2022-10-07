@@ -106,7 +106,7 @@ int main(int argc, char *argv[])
     printf("New termios structure set\n");
 
     
-    unsigned char buf[2] = {0}, parcels[5] = {0}; // +1: Save space for the final '\0' char
+    unsigned char buf[1] = {0}, parcels[5] = {0}; // +1: Save space for the final '\0' char
 
     STATE st = STATE0;
     bool readByte = true;
@@ -126,7 +126,6 @@ int main(int argc, char *argv[])
             if(buf[0] == 0x7E){
                 st = STATE1;
                 parcels[0] = buf[0];
-                printf("flag 1 received\n");
             }
             break;
 
@@ -134,7 +133,6 @@ int main(int argc, char *argv[])
             if(buf[0] != 0x7E){
                 st = STATE2;
                 parcels[1] = buf[0];
-                printf("address received\n");
             }
             else {
                 st = STATE0;
@@ -146,7 +144,6 @@ int main(int argc, char *argv[])
             if(buf[0] != 0x7E){
                 st = STATE3;
                 parcels[2] = buf[0];
-                printf("control received\n");
             }
             else {
                 st = STATE0;
@@ -158,7 +155,6 @@ int main(int argc, char *argv[])
             if(buf[0] != 0x7E){
                 parcels[3] = buf[0];
                 st = STATE4;
-                printf("bcc received\n");
             }
             else {
                 st = STATE0;
@@ -171,7 +167,6 @@ int main(int argc, char *argv[])
                 parcels[4] = buf[0];
                 st = STATE5;
                 readByte = false;
-                printf("flag 2 received\n");
             }
 
             else {
@@ -181,12 +176,13 @@ int main(int argc, char *argv[])
             break;
         case STATE5:
             if(((parcels[1])^(parcels[2]))==(parcels[3])){
-                printf("\ngreat success! no error during transmission\n\n");
+                printf("\nGreat success! SET message received without errors\n\n");
                 STOP = TRUE;
             }
             else {
                 st = STATE0;
                 memset(parcels, 0, 5);
+                readByte = true;
             }
             break;
         default:
@@ -194,11 +190,16 @@ int main(int argc, char *argv[])
         }
     }
 
-    //word[strlen(word)-1]='\0';
-    //int bytes = write(fd, word, strlen(word)+1);
+    parcels[2] = 0x07;
+    parcels[4] = parcels[2]^parcels[3];
 
-    // The while() cycle should be changed in order to respect the specifications
-    // of the protocol indicated in the Lab guide
+    int bytes = write(fd, parcels, sizeof(parcels));
+    printf("UA message sent, %d bytes written\n", bytes);
+
+
+
+
+
 
     // Restore the old port settings
     if (tcsetattr(fd, TCSANOW, &oldtio) == -1)

@@ -3,13 +3,12 @@
 // Modified by: Eduardo Nuno Almeida [enalmeida@fe.up.pt]
 
 #include <fcntl.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <termios.h>
-#include <unistd.h>
+#include "alarm.c" //aqui nao da se for alarm.h
 
 // Baudrate settings are defined in <asm/termbits.h>, which is
 // included by <termios.h>
@@ -40,7 +39,7 @@ int main(int argc, char *argv[])
 
     // Open serial port device for reading and writing, and not as controlling tty
     // because we don't want to get killed if linenoise sends CTRL-C.
-    int fd = open(serialPortName, O_RDWR | O_NOCTTY);
+    int fd = open(serialPortName, O_RDWR | O_NOCTTY | O_NONBLOCK);
 
     if (fd < 0)
     {
@@ -98,27 +97,28 @@ int main(int argc, char *argv[])
     buf[3] = 0x00;
     buf[4] = 0x7E;
     
-    /*if(gets(buf)== NULL){
-        printf("Erro gets\n");
-        exit(-1);
-    }
-    buf[strlen(buf)]='\0';*/
-
-    
-
-    
-
-    // In non-canonical mode, '\n' does not end the writing.
-    // Test this condition by placing a '\n' in the middle of the buffer.
-    // The whole buffer must be sent even with the '\n'.
-
     
     int bytes = write(fd, buf, sizeof(buf));
-    printf("%d bytes written\n", bytes);
+    
+    printf("\nSET message sent, %d bytes written\n", bytes);
+    memset(buf, 0 ,5); //limpar o buffer
+    
 
-    // Wait until all bytes have been written to the serial port
-    sleep(1);
+    while(alarmCount < 4){
+        startAlarm();
+        int result = read(fd, buf, 5);
+        if(result != -1 && buf != 0){
+            printf("\nUA received:0x%x%x%x%x%x\n", buf[0], buf[1], buf[2], buf[3], buf[4]);
+            break;
+        }
 
+    }
+
+    if(alarmCount > 3){
+        printf("\nAlarm limit reached, SET message not sent\n");
+    }
+    
+    
     // Restore the old port settings
     if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
     {
