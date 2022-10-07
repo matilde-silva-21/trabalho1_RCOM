@@ -111,6 +111,7 @@ int main(int argc, char *argv[])
     STATE st = STATE0;
     bool readByte = true;
 
+    sleep(6);
     // Loop for input
     while (STOP == FALSE)
     { 
@@ -192,6 +193,8 @@ int main(int argc, char *argv[])
 
     parcels[2] = 0x07;
     parcels[4] = parcels[2]^parcels[3];
+
+    //preciso de estar dentro da state machine ate receber um sinal a dizer que o UA foi corretamente recebido
 
     int bytes = write(fd, parcels, sizeof(parcels));
     printf("UA message sent, %d bytes written\n", bytes);

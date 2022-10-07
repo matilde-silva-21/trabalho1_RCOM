@@ -97,19 +97,31 @@ int main(int argc, char *argv[])
     buf[3] = 0x00;
     buf[4] = 0x7E;
     
-    
-    int bytes = write(fd, buf, sizeof(buf));
-    
-    printf("\nSET message sent, %d bytes written\n", bytes);
-    memset(buf, 0 ,5); //limpar o buffer
+     //limpar o buffer
     
 
     while(alarmCount < 4){
+        int bytes = write(fd, buf, sizeof(buf));
+
+        if(!alarmEnabled){
+            printf("\nSET message sent, %d bytes written\n", bytes);
+            memset(buf, 0 ,5);
+        }
+        
         startAlarm();
+        
         int result = read(fd, buf, 5);
         if(result != -1 && buf != 0){
-            printf("\nUA received:0x%x%x%x%x%x\n", buf[0], buf[1], buf[2], buf[3], buf[4]);
-            break;
+            //se o UA estiver errado 
+            if(buf[2] != 0x07 || (buf[4] != (buf[2]^buf[3]))){
+                printf("\nUA not correct: 0x%02x%02x%02x%02x%02x\n", buf[0], buf[1], buf[2], buf[3], buf[4]);
+                break;
+            }
+            
+            else{   
+                printf("\nUA correctly received: 0x%02x%02x%02x%02x%02x\n", buf[0], buf[1], buf[2], buf[3], buf[4]);
+                break;
+            }
         }
 
     }
