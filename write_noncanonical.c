@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
     printf("New termios structure set\n");
 
     // Create string to send
-    unsigned char buf[5] = {0};
+    unsigned char buf[5] = {0}, parcels[5] = {0};
 
     buf[0] = 0x7E;
     buf[1] = 0x03;
@@ -109,16 +109,16 @@ int main(int argc, char *argv[])
             startAlarm();
         }
         
-        int result = read(fd, buf, 5);
-        if(result != -1 && buf != 0){
+        int result = read(fd, parcels, 5);
+        if(result != -1 && parcels != 0){
             //se o UA estiver errado 
-            if(buf[2] != 0x07 || (buf[4] != (buf[2]^buf[3]))){
-                printf("\nUA not correct: 0x%02x%02x%02x%02x%02x\n", buf[0], buf[1], buf[2], buf[3], buf[4]);
+            if(parcels[2] != 0x07 || (parcels[4] != (parcels[2]^parcels[3]))){
+                printf("\nUA not correct: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
                 break;
             }
             
             else{   
-                printf("\nUA correctly received: 0x%02x%02x%02x%02x%02x\n", buf[0], buf[1], buf[2], buf[3], buf[4]);
+                printf("\nUA correctly received: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
                 break;
             }
         }
