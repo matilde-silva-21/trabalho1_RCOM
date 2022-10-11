@@ -4,10 +4,19 @@
 #ifndef _LINK_LAYER_H_
 #define _LINK_LAYER_H_
 
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <termios.h>
+#include "alarm.h" //aqui nao da se for alarm.h
+
+
 typedef enum
 {
-    LlTx,
-    LlRx,
+    LlTx, //transmissor
+    LlRx, //recetor
 } LinkLayerRole;
 
 typedef struct
@@ -19,6 +28,16 @@ typedef struct
     int timeout;
 } LinkLayer;
 
+
+enum state {
+    STATE0,
+    STATE1,
+    STATE2,
+    STATE3, 
+    STATE4,
+    STATE5      
+} typedef STATE;
+
 // SIZE of maximum acceptable payload.
 // Maximum number of bytes that application layer should send to link layer
 #define MAX_PAYLOAD_SIZE 1000
@@ -26,6 +45,8 @@ typedef struct
 // MISC
 #define FALSE 0
 #define TRUE 1
+
+volatile int STOP = FALSE;
 
 // Open a connection using the "port" parameters defined in struct linkLayer.
 // Return "1" on success or "-1" on error.
