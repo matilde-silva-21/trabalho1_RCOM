@@ -105,7 +105,6 @@ int main(int argc, char *argv[])
         if(!alarmEnabled){
             int bytes = write(fd, buf, sizeof(buf));
             printf("\nSET message sent, %d bytes written\n", bytes);
-            memset(buf, 0 ,5);
             startAlarm();
         }
         
