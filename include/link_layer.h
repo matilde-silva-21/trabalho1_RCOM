@@ -10,7 +10,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <termios.h>
-#include "alarm.h" //aqui nao da se for alarm.h
 
 
 typedef enum

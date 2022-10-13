@@ -1,3 +1,7 @@
+#ifndef _ALARM_H_
+#define _ALARM_H_
+
+
 #include <unistd.h>
 #include <signal.h>
 #include <stdio.h>
@@ -11,4 +15,6 @@ int alarmCount = 0;
 void alarmHandler(int signal);
 
 int startAlarm();
+
+#endif // _ALARM_H_
 
