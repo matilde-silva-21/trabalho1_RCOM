@@ -12,6 +12,8 @@ extern int alarmEnabled, alarmCount;
 ////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters)
 {
+    volatile int STOP = FALSE;
+
     int fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY | O_NONBLOCK);
 
     if (fd < 0)
@@ -78,13 +80,13 @@ int llopen(LinkLayer connectionParameters)
             if(!alarmEnabled){
                 int bytes = write(fd, buf, sizeof(buf));
                 printf("\nSET message sent, %d bytes written\n", bytes);
-                startAlarm();
+                startAlarm(connectionParameters.timeout);
             }
             
             int result = read(fd, parcels, 5);
             if(result != -1 && parcels != 0){
                 //se o UA estiver errado 
-                if(parcels[2] != 0x07 || (parcels[4] != (parcels[2]^parcels[3]))){
+                if(parcels[2] != 0x07 || (parcels[3] != (parcels[1]^parcels[2]))){
                     printf("\nUA not correct: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
                     return -1;
                 }
@@ -103,98 +105,99 @@ int llopen(LinkLayer connectionParameters)
         }
     }
 
-    else{
+    else
+    {
         unsigned char buf[1] = {0}, parcels[5] = {0}; // +1: Save space for the final '\0' char
 
-    STATE st = STATE0;
-    unsigned char readByte = TRUE;
-    
-    // Loop for input
-    while (STOP == FALSE)
-    { 
-        if(readByte){
-            int bytes = read(fd, buf, 1); //ler byte a byte
-            if(bytes==0) continue;
-        }
-       
+        STATE st = STATE0;
+        unsigned char readByte = TRUE;
         
-        switch (st)
-        {
-        case STATE0:
-            if(buf[0] == 0x7E){
-                st = STATE1;
-                parcels[0] = buf[0];
+        // Loop for input
+        while (STOP == FALSE)
+        { 
+            if(readByte){
+                int bytes = read(fd, buf, 1); //ler byte a byte
+                if(bytes==0) continue;
             }
-            break;
+        
+            
+            switch (st)
+            {
+            case STATE0:
+                if(buf[0] == 0x7E){
+                    st = STATE1;
+                    parcels[0] = buf[0];
+                }
+                break;
 
-        case STATE1:
-            if(buf[0] != 0x7E){
-                st = STATE2;
-                parcels[1] = buf[0];
-            }
-            else {
-                st = STATE0;
-                memset(parcels, 0, 5);
-            }
-            break;
+            case STATE1:
+                if(buf[0] != 0x7E){
+                    st = STATE2;
+                    parcels[1] = buf[0];
+                }
+                else {
+                    st = STATE0;
+                    memset(parcels, 0, 5);
+                }
+                break;
 
-        case STATE2:
-            if(buf[0] != 0x7E){
-                st = STATE3;
-                parcels[2] = buf[0];
-            }
-            else {
-                st = STATE0;
-                memset(parcels, 0, 5);
-            }
-            break;
+            case STATE2:
+                if(buf[0] != 0x7E){
+                    st = STATE3;
+                    parcels[2] = buf[0];
+                }
+                else {
+                    st = STATE0;
+                    memset(parcels, 0, 5);
+                }
+                break;
 
-        case STATE3:
-            if(buf[0] != 0x7E){
-                parcels[3] = buf[0];
-                st = STATE4;
-            }
-            else {
-                st = STATE0;
-                memset(parcels, 0, 5);
-            }
-            break;
+            case STATE3:
+                if(buf[0] != 0x7E){
+                    parcels[3] = buf[0];
+                    st = STATE4;
+                }
+                else {
+                    st = STATE0;
+                    memset(parcels, 0, 5);
+                }
+                break;
 
-        case STATE4:
-            if(buf[0] == 0x7E){
-                parcels[4] = buf[0];
-                st = STATE5;
-                readByte = FALSE;
-            }
+            case STATE4:
+                if(buf[0] == 0x7E){
+                    parcels[4] = buf[0];
+                    st = STATE5;
+                    readByte = FALSE;
+                }
 
-            else {
-                st = STATE0;
-                memset(parcels, 0, 5);
+                else {
+                    st = STATE0;
+                    memset(parcels, 0, 5);
+                }
+                break;
+            case STATE5:
+                if(((parcels[1])^(parcels[2]))==(parcels[3])){
+                    printf("\nGreat success! SET message received without errors\n\n");
+                    STOP = TRUE;
+                }
+                else {
+                    st = STATE0;
+                    memset(parcels, 0, 5);
+                    readByte = TRUE;
+                }
+                break;
+            default:
+                break;
             }
-            break;
-        case STATE5:
-            if(((parcels[1])^(parcels[2]))==(parcels[3])){
-                printf("\nGreat success! SET message received without errors\n\n");
-                STOP = TRUE;
-            }
-            else {
-                st = STATE0;
-                memset(parcels, 0, 5);
-                readByte = TRUE;
-            }
-            break;
-        default:
-            break;
         }
-    }
 
-    parcels[2] = 0x07;
-    parcels[4] = parcels[2]^parcels[3];
+        parcels[2] = 0x07;
+        parcels[3] = parcels[1]^parcels[2];
 
-    //preciso de estar dentro da state machine ate receber um sinal a dizer que o UA foi corretamente recebido
+        //preciso de estar dentro da state machine ate receber um sinal a dizer que o UA foi corretamente recebido
 
-    int bytes = write(fd, parcels, sizeof(parcels));
-    printf("UA message sent, %d bytes written\n", bytes);
+        int bytes = write(fd, parcels, sizeof(parcels));
+        printf("UA message sent, %d bytes written\n", bytes);
     }
 
     if (tcsetattr(fd, TCSANOW, &oldtio) == -1)

@@ -12,14 +12,14 @@ void alarmHandler(int signal)
 }
 
 //Starts the alarm
-int startAlarm()
+int startAlarm(int timeout)
 {
     // Set alarm function handler
     (void)signal(SIGALRM, alarmHandler);
 
     if (alarmEnabled == FALSE)
     {
-        alarm(3); // Set alarm to be triggered in 3s
+        alarm(timeout); // Set alarm to be triggered in 3s
         alarmEnabled = TRUE;
     }
     
