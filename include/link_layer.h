@@ -10,6 +10,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <termios.h>
+#include <math.h>
+#include <stdio.h>
 
 
 typedef enum

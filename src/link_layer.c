@@ -14,7 +14,7 @@ int llopen(LinkLayer connectionParameters)
 {
     volatile int STOP = FALSE;
 
-    int fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY | O_NONBLOCK);
+    int fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY);
 
     if (fd < 0)
     {
