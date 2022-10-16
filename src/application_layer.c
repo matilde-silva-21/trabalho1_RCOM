@@ -4,6 +4,7 @@
 
 void applicationLayer(const char *serialPort, const char *role, int baudRate, int nTries, int timeout, const char *filename)
 {
+
     LinkLayerRole lr;
 
     if(strcmp (role, "tx") == 0){
@@ -36,7 +37,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             printf("Couldn't find a file with that name, sorry :(\n");
             return;
         }
-        
+
         while(fileNotOver){
             
             if(!fread(&curByte, (size_t)1, (size_t) 1, fileptr)){

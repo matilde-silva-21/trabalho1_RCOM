@@ -14,6 +14,8 @@ int nTries, timeout, fd;
 ////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters)
 {
+    printf("\n---------------LLOPEN---------------\n\n");
+
     volatile int STOP = FALSE;
 
     fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY | O_NONBLOCK);
@@ -228,6 +230,8 @@ int llwrite(const unsigned char *buf, int bufSize)
     //4º enviar a infoFrame e contar o alarme
     //5º factCheck a frame recebida do llread (ver se tem erros ou assim)
     //6º llwrite so termina quando recebe mensagem de sucesso ou quando o limite de tentativas é excedido
+
+    printf("\n---------------LLWRITE---------------\n\n");
 
     unsigned char BCC = 0x00, infoFrame[6+bufSize*2], parcels[5] = {0};
     int index = 4, STOP = 0, control = (receiverNumber << 7) | 0x05;
