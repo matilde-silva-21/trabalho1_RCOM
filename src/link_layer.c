@@ -6,6 +6,8 @@
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
 extern int alarmEnabled, alarmCount;
+int senderNumber = 0, receiverNumber = 1;
+int nTries, timeout, fd;
 
 ////////////////////////////////////////////////
 // LLOPEN
@@ -14,7 +16,7 @@ int llopen(LinkLayer connectionParameters)
 {
     volatile int STOP = FALSE;
 
-    int fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY);
+    fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY | O_NONBLOCK);
 
     if (fd < 0)
     {
@@ -63,6 +65,9 @@ int llopen(LinkLayer connectionParameters)
 
     printf("New termios structure set\n");
 
+    nTries = connectionParameters.nRetransmissions;
+    timeout = connectionParameters.timeout;
+
 
     if(connectionParameters.role == LlTx){
 
@@ -75,12 +80,12 @@ int llopen(LinkLayer connectionParameters)
         buf[4] = 0x7E;
 
 
-        while(connectionParameters.nRetransmissions < 4){
+        while(alarmCount <= nTries){
 
             if(!alarmEnabled){
                 int bytes = write(fd, buf, sizeof(buf));
                 printf("\nSET message sent, %d bytes written\n", bytes);
-                startAlarm(connectionParameters.timeout);
+                startAlarm(timeout);
             }
             
             int result = read(fd, parcels, 5);
@@ -88,7 +93,8 @@ int llopen(LinkLayer connectionParameters)
                 //se o UA estiver errado 
                 if(parcels[2] != 0x07 || (parcels[3] != (parcels[1]^parcels[2]))){
                     printf("\nUA not correct: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
-                    return -1;
+                    alarmEnabled = FALSE;
+                    continue;
                 }
                 
                 else{   
@@ -216,7 +222,72 @@ int llopen(LinkLayer connectionParameters)
 ////////////////////////////////////////////////
 int llwrite(const unsigned char *buf, int bufSize)
 {
-    // TODO
+    //1º criar o BCC para o dataPacket
+    //2º fazer byte stuffing
+    //3º criar a nova infoFrame com o dataPacket (ja stuffed) la dentro
+    //4º enviar a infoFrame e contar o alarme
+    //5º factCheck a frame recebida do llread (ver se tem erros ou assim)
+    //6º llwrite so termina quando recebe mensagem de sucesso ou quando o limite de tentativas é excedido
+
+    unsigned char BCC = 0x00, infoFrame[6+bufSize*2], parcels[5] = {0};
+    int index = 4, STOP = 0, control = (receiverNumber << 7) | 0x05;
+
+
+    for(int i=0; i<bufSize; i++){
+        BCC = (BCC ^ buf[i]);
+    }
+
+    infoFrame[0]=0x7E; //Flag
+    infoFrame[1]=0x03; //Address
+    infoFrame[2]=(senderNumber << 6); //Control
+    infoFrame[3]=infoFrame[1]^infoFrame[2];
+
+
+    for(int i=0; i<bufSize; i++){
+        if(buf[i]==0x7E){
+            infoFrame[index++]=0x7D;
+            infoFrame[index++]=0x5e;
+            continue;
+        }
+        infoFrame[index++]=buf[i];
+    }
+
+    infoFrame[index++]=BCC;
+    infoFrame[index++]=0x7E;
+
+    while(!STOP){
+        if(!alarmEnabled){
+            write(fd, infoFrame, index);
+            printf("\nInfoFrame sent NS=%d\n", senderNumber);
+            startAlarm(timeout);
+        }
+        
+        int result = read(fd, parcels, 5);
+
+        if(result != 0){
+            if(parcels[2] != (control) || (parcels[3] != (parcels[1]^parcels[2]))){
+                    printf("\nRR not correct: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
+                    alarmEnabled = FALSE;
+                    continue;
+            }
+            else{
+                printf("\nRR correctly received\n");
+                STOP = 1;
+            }
+        }
+
+        else if(alarmCount == nTries){
+            printf("\nllwrite error: Exceeded number of tries when sending frame\n");
+            return -1;
+        }
+
+    }
+
+
+    if(senderNumber){
+        senderNumber = 0;
+    }
+    else {senderNumber = 1;}
 
     return 0;
 }

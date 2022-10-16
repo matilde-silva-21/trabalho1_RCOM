@@ -19,7 +19,7 @@ int startAlarm(int timeout)
 
     if (alarmEnabled == FALSE)
     {
-        alarm(timeout); // Set alarm to be triggered in 3s
+        alarm(timeout);
         alarmEnabled = TRUE;
     }
     
