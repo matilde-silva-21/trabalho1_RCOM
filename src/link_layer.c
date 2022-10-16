@@ -69,7 +69,7 @@ int llopen(LinkLayer connectionParameters)
     timeout = connectionParameters.timeout;
 
 
-    if(connectionParameters.role == LlTx){
+    if(connectionParameters.role == LlRx){
 
         unsigned char buf[5] = {0}, parcels[5] = {0};
 
@@ -89,7 +89,7 @@ int llopen(LinkLayer connectionParameters)
             }
             
             int result = read(fd, parcels, 5);
-            if(result != -1 && parcels != 0){
+            if(result != -1 && parcels != 0 && parcels[0]==0x7E){
                 //se o UA estiver errado 
                 if(parcels[2] != 0x07 || (parcels[3] != (parcels[1]^parcels[2]))){
                     printf("\nUA not correct: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
@@ -105,7 +105,7 @@ int llopen(LinkLayer connectionParameters)
 
         }
 
-        if(alarmCount > 3){
+        if(alarmCount > nTries){
             printf("\nAlarm limit reached, SET message not sent\n");
             return -1;
         }
@@ -264,7 +264,7 @@ int llwrite(const unsigned char *buf, int bufSize)
         
         int result = read(fd, parcels, 5);
 
-        if(result != 0){
+        if(result != -1 && parcels != 0 && parcels[0]==0x7E && parcels[4]==0x7E){
             if(parcels[2] != (control) || (parcels[3] != (parcels[1]^parcels[2]))){
                     printf("\nRR not correct: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
                     alarmEnabled = FALSE;
@@ -276,8 +276,9 @@ int llwrite(const unsigned char *buf, int bufSize)
             }
         }
 
-        else if(alarmCount == nTries){
+        else if(alarmCount > nTries){
             printf("\nllwrite error: Exceeded number of tries when sending frame\n");
+            STOP = 1;
             return -1;
         }
 

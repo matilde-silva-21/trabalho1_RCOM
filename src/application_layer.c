@@ -19,41 +19,52 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
     ll.role = lr;
 
     if(llopen(ll)==-1) {
-        return -1;
+        return;
     }
 
-    unsigned char packet[1200], bytes[200], fileNotOver = 1;
-	int sizeDataPacket = 0;
+    if(lr == 1){
 
-    FILE *fileptr;
+        unsigned char packet[1200], bytes[200], fileNotOver = 1;
+        int sizeDataPacket = 0;
 
-    int nBytes = 200, curByte=0, index=0, nSequence = 0;
+        FILE *fileptr;
 
-    fileptr = fopen(filename, "rb");        // Open the file in binary mode
-    if(fileptr == NULL){
-        printf("Couldn't find a file with that name, sorry :(\n");
-        return -1;
-    }
+        int nBytes = 200, curByte=0, index=0, nSequence = 0;
 
-    while(fileNotOver){
+        fileptr = fopen(filename, "rb");        // Open the file in binary mode
+        if(fileptr == NULL){
+            printf("Couldn't find a file with that name, sorry :(\n");
+            return;
+        }
+        
+        while(fileNotOver){
+            
+            if(!fread(&curByte, (size_t)1, (size_t) 1, fileptr)){
+                fileNotOver = 0;
+                sizeDataPacket = getDataPacket(bytes, packet, nSequence++, index);
+                if(llwrite(packet, sizeDataPacket) == -1){
+                    return;
+                }
+            }
 
-		if(!fread(&curByte, (size_t)1, (size_t) 1, fileptr)){
-			fileNotOver = 0;
-			sizeDataPacket = getDataPacket(bytes, packet, nSequence++, index);
-            //llwrite(packet, sizeDataPacket);
-		}
+            else if(nBytes == (index-1)) {
+                getDataPacket(bytes, packet, nSequence++, index);
+                if(llwrite(packet, sizeDataPacket) == -1){
+                    return;
+                }
+                memset(bytes,0,sizeof(bytes));
+                memset(packet,0,sizeof(packet));
+                index = 0;
+            }
 
-        else if(nBytes == (index-1)) {
-            getDataPacket(bytes, packet, nSequence++, index);
-            //llwrite(packet, sizeDataPacket);
-            memset(bytes,0,sizeof(bytes));
-            memset(packet,0,sizeof(packet));
-            index = 0;
+            bytes[index++] = curByte;
         }
 
-        bytes[index++] = curByte;
     }
 
+    else{
+        //llread
+    }
 }
 
 int getControlPacket(char* filename, int start, unsigned char* packet, int *sizeOfPacket){
