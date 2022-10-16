@@ -22,12 +22,12 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
         return -1;
     }
 
-    unsigned char packet[1200], bytes[124], fileNotOver = 1;
+    unsigned char packet[1200], bytes[200], fileNotOver = 1;
 	int sizeDataPacket = 0;
 
     FILE *fileptr;
 
-    int nBytes = 124, curByte=0, index=0, nSequence = 0;
+    int nBytes = 200, curByte=0, index=0, nSequence = 0;
 
     fileptr = fopen(filename, "rb");        // Open the file in binary mode
     if(fileptr == NULL){
