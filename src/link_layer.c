@@ -319,7 +319,7 @@ int llclose(int showStatistics)
         
         while(tries<connection.nRetransmissions && !receivedDISC_tx){
             alarm(connection.timeout);
-            alarmEnabled=1;
+            alarmEnabled= FALSE;
             
             if(tries>0)
                 printf("Break.\n");
