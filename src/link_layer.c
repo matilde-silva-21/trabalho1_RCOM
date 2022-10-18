@@ -13,12 +13,10 @@ int nTries, timeout, fd;
 // LLOPEN
 ////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters)
-{
-    printf("\n---------------LLOPEN---------------\n\n");
-
-    volatile int STOP = FALSE;
-
+{   
     fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY | O_NONBLOCK);
+
+    alarmCount = 0;
 
     if (fd < 0)
     {
@@ -66,6 +64,11 @@ int llopen(LinkLayer connectionParameters)
     }
 
     printf("New termios structure set\n");
+    
+
+    printf("\n---------------LLOPEN---------------\n\n");
+
+    volatile int STOP = FALSE;
 
     nTries = connectionParameters.nRetransmissions;
     timeout = connectionParameters.timeout;
@@ -208,13 +211,15 @@ int llopen(LinkLayer connectionParameters)
         printf("UA message sent, %d bytes written\n", bytes);
     }
 
-    if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
+    alarmEnabled = FALSE;
+
+    /*if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
     {
         perror("tcsetattr");
         exit(-1);
-    }
+    }*/
 
-    close(fd);
+    //close(fd);
 
     return 1;
 }
@@ -224,6 +229,7 @@ int llopen(LinkLayer connectionParameters)
 ////////////////////////////////////////////////
 int llwrite(const unsigned char *buf, int bufSize)
 {
+
     //1º criar o BCC para o dataPacket
     //2º fazer byte stuffing
     //3º criar a nova infoFrame com o dataPacket (ja stuffed) la dentro
@@ -233,8 +239,10 @@ int llwrite(const unsigned char *buf, int bufSize)
 
     printf("\n---------------LLWRITE---------------\n\n");
 
+    alarmCount = 0;
+
     unsigned char BCC = 0x00, infoFrame[6+bufSize*2], parcels[5] = {0};
-    int index = 4, STOP = 0, control = (receiverNumber << 7) | 0x05;
+    int index = 4, STOP = 0, controlReceiver = (receiverNumber << 7) | 0x05;
 
 
     for(int i=0; i<bufSize; i++){
@@ -268,14 +276,16 @@ int llwrite(const unsigned char *buf, int bufSize)
         
         int result = read(fd, parcels, 5);
 
-        if(result != -1 && parcels != 0 && parcels[0]==0x7E && parcels[4]==0x7E){
-            if(parcels[2] != (control) || (parcels[3] != (parcels[1]^parcels[2]))){
+        if(result != -1 && parcels != 0 /*&& parcels[0]==0x7E && parcels[4]==0x7E*/){
+            if(parcels[2] != (controlReceiver) || (parcels[3] != (parcels[1]^parcels[2]))){
                     printf("\nRR not correct: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
                     alarmEnabled = FALSE;
                     continue;
             }
+            
             else{
                 printf("\nRR correctly received\n");
+                alarmEnabled = FALSE;
                 STOP = 1;
             }
         }
@@ -300,11 +310,93 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 // LLREAD
 ////////////////////////////////////////////////
-int llread(unsigned char *packet)
-{
-    // TODO
+int llread(unsigned char *packet, int sizeOfPacket)
+{   
 
-    return 0;
+    unsigned char infoFrame[1200]={0}, buffer[1000]={0}, supFrame[5]={0}, BCC2=0x00;
+
+    int result = read(fd, infoFrame, 1200), index = 0;
+
+    if(result == -1){
+        return -1;
+    }
+
+
+    printf("\n---------------LLREAD---------------\n\n");
+    //1º ler o pipe
+    //2º fazer de-stuff aos bytes lidos
+    //3º verificar que os BCCs estao certos
+    //4º enviar a mensagem de confirmacao de receçao, positiva se correu tudo bem, negativa se BCC ou assim esta mal
+    
+    //fazer as contas para confirmar o valor max do buffer
+    
+    supFrame[0] = 0x7E;
+    supFrame[1] = 0x03;
+    supFrame[4] = 0x7E;
+
+    if(infoFrame[0]!=0x7E || (infoFrame[1]^infoFrame[2]) != infoFrame[3]){
+        printf("\nInfoFrame not received correctly. Sending REJ.\n");
+        supFrame[2] = (receiverNumber << 7) | 0x01;
+        supFrame[3] = supFrame[1] ^ supFrame[2];
+        write(fd, supFrame, 5);
+        return -1;
+    }
+
+
+
+
+    for(int i=4; i<1200-1; i++){
+        if(infoFrame[i] == 0x7D && infoFrame[i+1]==0x5e){
+            buffer[index++] = 0x7E;
+            i++;
+        }
+        else {buffer[index++] = infoFrame[i];}
+    }
+
+
+
+
+    int size = 0; //tamanho da secçao de dados
+
+    if(buffer[4]==0x01){
+        size = 256*buffer[6]+buffer[7]+4; //+4 para contar com os bytes de controlo, numero de seq e tamanho
+        for(int i=4; i<size; i++){
+            BCC2 = BCC2 ^ buffer[i];
+        }
+    }
+    
+    else{
+        size += buffer[6]+5; //+5 para contar com os bytes de controlo, parametro e tamanho
+        size += buffer[6+size+2];
+
+        for(int i=4; i<size; i++){
+            BCC2 = BCC2 ^ buffer[i];
+        }
+    }
+
+    
+
+    if(buffer[size+4] == BCC2){
+        printf("\nInfoFrame received correctly. Sending RR.\n");
+        supFrame[2] = (receiverNumber << 7) | 0x05;
+        supFrame[3] = supFrame[1] ^ supFrame[2];
+        write(fd, supFrame, 5);
+    }
+
+    sizeOfPacket = size+6;
+
+    for(int i=0; i<sizeOfPacket; i++){
+        packet[i] = buffer[i];
+    }
+
+
+    if(receiverNumber){
+        receiverNumber = 0;
+    }
+    else {receiverNumber = 1;}
+
+
+    return 1;
 }
 
 ////////////////////////////////////////////////
@@ -316,3 +408,4 @@ int llclose(int showStatistics)
 
     return 1;
 }
+

@@ -26,7 +26,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
     if(lr == 1){
 
         unsigned char packet[1200], bytes[200], fileNotOver = 1;
-        int sizeDataPacket = 0;
+        int sizePacket = 0;
 
         FILE *fileptr;
 
@@ -38,19 +38,28 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             return;
         }
 
+        if(!getControlPacket(filename,1,packet,sizePacket)){
+            return;
+        }
+
+        if(llwrite(packet, sizePacket) == -1){
+            return;
+        }
+
+
         while(fileNotOver){
             
             if(!fread(&curByte, (size_t)1, (size_t) 1, fileptr)){
                 fileNotOver = 0;
-                sizeDataPacket = getDataPacket(bytes, packet, nSequence++, index);
-                if(llwrite(packet, sizeDataPacket) == -1){
+                sizePacket = getDataPacket(bytes, packet, nSequence++, index);
+                if(llwrite(packet, sizePacket) == -1){
                     return;
                 }
             }
 
             else if(nBytes == (index-1)) {
                 getDataPacket(bytes, packet, nSequence++, index);
-                if(llwrite(packet, sizeDataPacket) == -1){
+                if(llwrite(packet, sizePacket) == -1){
                     return;
                 }
                 memset(bytes,0,sizeof(bytes));
@@ -61,11 +70,43 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             bytes[index++] = curByte;
         }
 
+        fclose(fileptr);
+
+        if(!getControlPacket(filename,0,packet,sizePacket)){
+            return;
+        }
+
+        if(llwrite(packet, sizePacket) == -1){
+            return;
+        }
+
     }
 
     else{
-        //llread
+        // 1º chamar llread
+        // 2º ler o packet do llread, se for um control packet START, criar um ficheiro novo, quando receber o close fecho o ficheiro que estou a escrever e paro de chamar llread, se for 0, prox iteraçao chamr llread de novo
+        // 3º escrever os dataPacket no ficheiro que criei
+        FILE *fileptr;
+
+        while(1){
+            unsigned char packet[1200] = {0};
+            int sizeOfPacket = 0;
+            llread(packet, sizeOfPacket);
+            if(packet[4] == 0x03){
+                fclose(fileptr);
+                break;
+            }
+            else if(packet[4]==0x02){
+                fileptr = fopen("penguin-copy.gif", "wb");   
+            }
+            else{
+                fwrite(packet, sizeOfPacket, 1, fileptr);
+            }
+        }
     }
+
+    return;
+
 }
 
 int getControlPacket(char* filename, int start, unsigned char* packet, int *sizeOfPacket){
@@ -99,6 +140,7 @@ int getControlPacket(char* filename, int start, unsigned char* packet, int *size
     packet[2] = fileSizeBytes;
 
 
+
 	for(int i=0; i<strlen(hex_string); i++){
 		packet[index++] = hex_string[i];
 	}
@@ -111,12 +153,10 @@ int getControlPacket(char* filename, int start, unsigned char* packet, int *size
 		packet[index++] = filename[i];
 	}
 
-	*sizeOfPacket = index;
+	sizeOfPacket = index;
     return 1;
 
 }
-
-
 
 int getDataPacket(unsigned char* bytes, unsigned char* packet, int nSequence, int nBytes){
 
