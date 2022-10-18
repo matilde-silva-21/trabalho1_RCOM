@@ -7,7 +7,7 @@
 
 extern int alarmEnabled, alarmCount;
 int senderNumber = 0, receiverNumber = 1;
-int nTries, timeout, fd;
+int nTries, timeout, fd, lastFrameNumber = 7;
 
 ////////////////////////////////////////////////
 // LLOPEN
@@ -66,7 +66,7 @@ int llopen(LinkLayer connectionParameters)
     printf("New termios structure set\n");
     
 
-    printf("\n---------------LLOPEN---------------\n\n");
+    printf("\n------------------------------LLOPEN------------------------------\n\n");
 
     volatile int STOP = FALSE;
 
@@ -104,6 +104,7 @@ int llopen(LinkLayer connectionParameters)
                 
                 else{   
                     printf("\nUA correctly received: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
+                    alarmEnabled = FALSE;
                     break;
                 }
             }
@@ -237,14 +238,14 @@ int llwrite(const unsigned char *buf, int bufSize)
     //5º factCheck a frame recebida do llread (ver se tem erros ou assim)
     //6º llwrite so termina quando recebe mensagem de sucesso ou quando o limite de tentativas é excedido
 
-    printf("\n---------------LLWRITE---------------\n\n");
+    printf("\n------------------------------LLWRITE------------------------------\n\n");
 
     alarmCount = 0;
 
-    unsigned char BCC = 0x00, infoFrame[6+bufSize*2], parcels[5] = {0};
+    unsigned char BCC = 0x00, infoFrame[600] = {0}, parcels[5] = {0};
     int index = 4, STOP = 0, controlReceiver = (receiverNumber << 7) | 0x05;
 
-
+    //BCC working correctly
     for(int i=0; i<bufSize; i++){
         BCC = (BCC ^ buf[i]);
     }
@@ -254,18 +255,29 @@ int llwrite(const unsigned char *buf, int bufSize)
     infoFrame[2]=(senderNumber << 6); //Control
     infoFrame[3]=infoFrame[1]^infoFrame[2];
 
-
     for(int i=0; i<bufSize; i++){
         if(buf[i]==0x7E){
             infoFrame[index++]=0x7D;
             infoFrame[index++]=0x5e;
             continue;
         }
+
         infoFrame[index++]=buf[i];
     }
 
     infoFrame[index++]=BCC;
     infoFrame[index++]=0x7E;
+
+    /*printf("\n-----LLWrite 270 buffer before de-stuff-----\n");
+    printf("\nSize of infoFrame: %d\nInfoFrame: 0x", index);
+
+    for(int i=0; i<index; i++){
+        printf("%02X ", infoFrame[i]);
+    }
+
+    printf("\n\n");*/
+
+    //ate aqui codigo funciona como pretendido
 
     while(!STOP){
         if(!alarmEnabled){
@@ -274,9 +286,14 @@ int llwrite(const unsigned char *buf, int bufSize)
             startAlarm(timeout);
         }
         
+        
         int result = read(fd, parcels, 5);
+        
 
-        if(result != -1 && parcels != 0 /*&& parcels[0]==0x7E && parcels[4]==0x7E*/){
+        if(result != -1 && parcels != 0){
+            /*alarmEnabled = FALSE;
+            return 1;*/
+
             if(parcels[2] != (controlReceiver) || (parcels[3] != (parcels[1]^parcels[2]))){
                     printf("\nRR not correct: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
                     alarmEnabled = FALSE;
@@ -284,7 +301,7 @@ int llwrite(const unsigned char *buf, int bufSize)
             }
             
             else{
-                printf("\nRR correctly received\n");
+                printf("\nRR correctly received: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
                 alarmEnabled = FALSE;
                 STOP = 1;
             }
@@ -310,19 +327,20 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 // LLREAD
 ////////////////////////////////////////////////
-int llread(unsigned char *packet, int sizeOfPacket)
+int llread(unsigned char *packet, int *sizeOfPacket)
 {   
+    /*codigo testado e a funcionar como pretendido*/
 
-    unsigned char infoFrame[1200]={0}, buffer[1000]={0}, supFrame[5]={0}, BCC2=0x00;
+    unsigned char infoFrame[600]={0}, supFrame[5]={0}, BCC2=0x00, aux[400] = {0};
 
-    int result = read(fd, infoFrame, 1200), index = 0;
+    int result = read(fd, infoFrame, 600), index = 0, control = (!receiverNumber) << 6;
 
     if(result == -1){
         return -1;
     }
 
 
-    printf("\n---------------LLREAD---------------\n\n");
+    printf("\n------------------------------LLREAD------------------------------\n\n");
     //1º ler o pipe
     //2º fazer de-stuff aos bytes lidos
     //3º verificar que os BCCs estao certos
@@ -332,25 +350,36 @@ int llread(unsigned char *packet, int sizeOfPacket)
     
     supFrame[0] = 0x7E;
     supFrame[1] = 0x03;
+    
     supFrame[4] = 0x7E;
 
     if(infoFrame[0]!=0x7E || (infoFrame[1]^infoFrame[2]) != infoFrame[3]){
-        printf("\nInfoFrame not received correctly. Sending REJ.\n");
+        /*printf("\nInfoFrame not received correctly. Sending REJ.\n");
         supFrame[2] = (receiverNumber << 7) | 0x01;
         supFrame[3] = supFrame[1] ^ supFrame[2];
         write(fd, supFrame, 5);
+
+        printf("\n-----REJ-----\n");
+        printf("\nSize of REJ: %d\nREJ: 0x", 5);
+
+        for(int i=0; i<5; i++){
+            printf("%02X ", supFrame[i]);
+        }
+
+        printf("\n\n");*/
+
         return -1;
     }
 
 
 
 
-    for(int i=4; i<1200-1; i++){
+    for(int i=0; i<600-1; i++){
         if(infoFrame[i] == 0x7D && infoFrame[i+1]==0x5e){
-            buffer[index++] = 0x7E;
+            packet[index++] = 0x7E;
             i++;
         }
-        else {buffer[index++] = infoFrame[i];}
+        else {packet[index++] = infoFrame[i];}
     }
 
 
@@ -358,35 +387,76 @@ int llread(unsigned char *packet, int sizeOfPacket)
 
     int size = 0; //tamanho da secçao de dados
 
-    if(buffer[4]==0x01){
-        size = 256*buffer[6]+buffer[7]+4; //+4 para contar com os bytes de controlo, numero de seq e tamanho
-        for(int i=4; i<size; i++){
-            BCC2 = BCC2 ^ buffer[i];
+    if(packet[4]==0x01){
+        size = 256*packet[6]+packet[7]+4 +6; //+4 para contar com os bytes de controlo, numero de seq e tamanho
+        for(int i=4; i<size-2; i++){
+            BCC2 = BCC2 ^ packet[i];
         }
     }
     
     else{
-        size += buffer[6]+5; //+5 para contar com os bytes de controlo, parametro e tamanho
-        size += buffer[6+size+2];
+        size += packet[6]+ 3 + 4; //+3 para contar com os bytes de C, T1 e L1 // +4 para contar com os bytes FLAG, A, C, BCC
+        size += packet[size+1] + 2 +2; //+2 para contar com T2 e L2 //+2 para contar com BCC2 e FLAG
 
-        for(int i=4; i<size; i++){
-            BCC2 = BCC2 ^ buffer[i];
+        for(int i=4; i<size-2; i++){
+            BCC2 = BCC2 ^ packet[i];
         }
     }
 
-    
 
-    if(buffer[size+4] == BCC2){
+    if(packet[size-2] == BCC2){
+
+        if(packet[4]==0x01){
+            if(infoFrame[5] == lastFrameNumber){
+                printf("\nInfoFrame received correctly. Sending RR.\n");
+                supFrame[2] = (receiverNumber << 7) | 0x05;
+                supFrame[3] = supFrame[1] ^ supFrame[2];
+                write(fd, supFrame, 5);
+                return -1;
+            }   
+            else{
+                lastFrameNumber = infoFrame[5];
+            }
+        }
         printf("\nInfoFrame received correctly. Sending RR.\n");
         supFrame[2] = (receiverNumber << 7) | 0x05;
         supFrame[3] = supFrame[1] ^ supFrame[2];
         write(fd, supFrame, 5);
     }
+    
+    else {
+        printf("\nInfoFrame not received correctly. Sending REJ.\n");
+        supFrame[2] = (receiverNumber << 7) | 0x01;
+        supFrame[3] = supFrame[1] ^ supFrame[2];
+        write(fd, supFrame, 5);
 
-    sizeOfPacket = size+6;
+        /*printf("\n-----REJ-----\n");
+        printf("\nSize of REJ: %d\nREJ: 0x", 5);
 
-    for(int i=0; i<sizeOfPacket; i++){
-        packet[i] = buffer[i];
+        for(int i=0; i<5; i++){
+            printf("%02X ", supFrame[i]);
+        }
+
+        printf("\n\n");*/
+
+        return -1;
+    }
+
+    (*sizeOfPacket) = size;
+
+    index = 0;
+    
+    for(int i=4; i<(*sizeOfPacket)-2; i++){
+        aux[index++] = packet[i];
+    }
+
+    
+    (*sizeOfPacket) = size - 6;
+
+    memset(packet,0,sizeof(packet));
+
+    for(int i=0; i<(*sizeOfPacket); i++){
+        packet[i] = aux[i];
     }
 
 
@@ -394,6 +464,8 @@ int llread(unsigned char *packet, int sizeOfPacket)
         receiverNumber = 0;
     }
     else {receiverNumber = 1;}
+
+    
 
 
     return 1;
@@ -404,7 +476,7 @@ int llread(unsigned char *packet, int sizeOfPacket)
 ////////////////////////////////////////////////
 int llclose(int showStatistics)
 {
-   {
+   /*{
     signal(SIGALRM,alarmHandler);
 
     if(connection.role==LlTx) {   //Transmitter
@@ -460,6 +532,6 @@ int llclose(int showStatistics)
 
     close(fd);
 
-    return 1;
+    return 1;*/
 }
 
