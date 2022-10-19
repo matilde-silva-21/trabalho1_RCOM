@@ -7,10 +7,12 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
 
     LinkLayerRole tr;
 
+    int statistics = 0;
+
     if(strcmp (role, "tx") == 0){
-        tr = 1;
+        tr = LlTx;
     }
-    else {tr = 0;}
+    else {tr = LlRx;}
 
     LinkLayer ll;
     strcpy(ll.serialPort, serialPort);
@@ -23,8 +25,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
         return;
     }
 
-    /*segmento testado e funcional (a excecao de llwrite)*/
-    if(tr == 1){
+    //segmento testado e funcional (a excecao de llwrite)
+    if(tr == LlTx){
 
         unsigned char packet[300], bytes[200], fileNotOver = 1;
         int sizePacket = 0;
@@ -101,7 +103,6 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
 
             /*printf("\n-----app layer 111 PACKET-----\n");
             printf("\nSize of P: %d\nDataPacket: 0x", sizeOfPacket);
-
             for(int i=0; i<sizeOfPacket; i++){
                 printf("%02X ", packet[i]);
             }
@@ -123,7 +124,10 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             }
         }
     }
-
+    
+    llclose(&statistics, ll);
+    
+    
     return;
 
 }

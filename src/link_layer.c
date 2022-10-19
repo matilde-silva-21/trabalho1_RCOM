@@ -74,7 +74,7 @@ int llopen(LinkLayer connectionParameters)
     timeout = connectionParameters.timeout;
 
 
-    if(connectionParameters.role == LlRx){
+    if(connectionParameters.role == LlTx){
 
         unsigned char buf[5] = {0}, parcels[5] = {0};
 
@@ -243,7 +243,7 @@ int llwrite(const unsigned char *buf, int bufSize)
     alarmCount = 0;
 
     unsigned char BCC = 0x00, infoFrame[600] = {0}, parcels[5] = {0};
-    int index = 4, STOP = 0, controlReceiver = (receiverNumber << 7) | 0x05;
+    int index = 4, STOP = 0, controlReceiver = (receiverNumber << 7) | 0x05, alarmCount = 0;
 
     //BCC working correctly
     for(int i=0; i<bufSize; i++){
@@ -310,6 +310,7 @@ int llwrite(const unsigned char *buf, int bufSize)
         else if(alarmCount > nTries){
             printf("\nllwrite error: Exceeded number of tries when sending frame\n");
             STOP = 1;
+            close(fd);
             return -1;
         }
 
@@ -474,8 +475,118 @@ int llread(unsigned char *packet, int *sizeOfPacket)
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(int showStatistics)
-{
+int llclose(int showStatistics, LinkLayer connectionParameters)
+{       
+
+    printf("\n------------------------------LLCLOSE------------------------------\n\n");
+
+    if(connectionParameters.role == LlRx){
+
+        unsigned char buf[6] = {0}, parcels[6] = {0};
+        unsigned char STOP = 0;
+
+        buf[0] = 0x7E;
+        buf[1] = 0x03;
+        buf[2] = 0x0B;
+        buf[3] = buf[1]^buf[2];
+        buf[4] = 0x7E;
+        buf[5] = '\0';
+
+
+        while(!STOP){
+            int result = read(fd, parcels, 5);
+            
+            parcels[5] = '\0';
+
+            if(result==-1){
+                continue;
+            }
+
+
+            else if(strcasecmp(buf, parcels) == 0){
+                printf("\nDISC message received. Responding now.\n");
+
+                printf("\nDISC message sent, %d bytes written\n", 5);
+
+                write(fd, buf, 5);
+                STOP = TRUE;
+            }
+            
+            else {
+                printf("\nDISC message incorrect: 0x%02X %02X %02X %02X %02X\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
+                continue;
+            }
+        
+        }
+
+        return;
+
+    }
+
+    else{
+        alarmCount = 0;
+
+        unsigned char buf[6] = {0}, parcels[6] = {0};
+
+        buf[0] = 0x7E;
+        buf[1] = 0x03;
+        buf[2] = 0x0B;
+        buf[3] = buf[1]^buf[2];
+        buf[4] = 0x7E;
+        buf[5] = '\0'; //assim posso usar o strcmp
+
+        while(alarmCount <= nTries){
+
+            if(!alarmEnabled){
+                
+                int bytes = write(fd, buf, 5);
+                printf("\nDISC message sent, %d bytes written\n", bytes);
+                startAlarm(timeout);
+            }
+
+            //sleep(2);
+            
+            int result = read(fd, parcels, 5);
+
+            parcels[6] = '\0';
+
+            if(result != -1 && parcels != 0 && parcels[0]==0x7E){
+                //se o DISC estiver errado 
+                if(strcasecmp(buf, parcels) != 0){
+                    printf("\nDISC not correct: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
+                    alarmEnabled = FALSE;
+                    continue;
+                }
+                
+                else{   
+                    printf("\nDISC correctly received: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
+                    alarmEnabled = FALSE;
+
+                    buf[2] = 0x07;
+                    buf[3] = buf[2]^buf[3];
+
+                    int bytes = write(fd, buf, 5);
+
+                    close(fd);
+
+                    printf("\nUA message sent, %d bytes written.\n\nI'm shutting off now, bye bye!\n", bytes);
+
+                    return 1;
+
+                }
+            }
+
+        }
+
+        if(alarmCount > nTries){
+            printf("\nAlarm limit reached, DISC message not sent\n");
+            close(fd);
+            return -1;
+        }
+
+
+    }
+
    /*{
     signal(SIGALRM,alarmHandler);
 
