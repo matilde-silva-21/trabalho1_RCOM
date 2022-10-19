@@ -7,7 +7,7 @@
 
 extern int alarmEnabled, alarmCount;
 int senderNumber = 0, receiverNumber = 1;
-int nTries, timeout, fd, lastFrameNumber = 7;
+int nTries, timeout, fd, lastFrameNumber = -1;
 
 ////////////////////////////////////////////////
 // LLOPEN
@@ -475,7 +475,7 @@ int llread(unsigned char *packet, int *sizeOfPacket)
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(int showStatistics, LinkLayer connectionParameters)
+int llclose(int showStatistics, LinkLayer connectionParameters, float runTime)
 {       
 
     printf("\n------------------------------LLCLOSE------------------------------\n\n");
@@ -518,8 +518,6 @@ int llclose(int showStatistics, LinkLayer connectionParameters)
             }
         
         }
-
-        return;
 
     }
 
@@ -570,7 +568,6 @@ int llclose(int showStatistics, LinkLayer connectionParameters)
                     close(fd);
 
                     printf("\nUA message sent, %d bytes written.\n\nI'm shutting off now, bye bye!\n", bytes);
-
                     return 1;
 
                 }
@@ -586,6 +583,16 @@ int llclose(int showStatistics, LinkLayer connectionParameters)
 
 
     }
+
+    if(showStatistics){
+        printf("\n------------------------------STATISTICS------------------------------\n\n");
+
+        printf("\nNumber of packets sent: %d\nSize of data packets in information frame: %d\nTotal run time: %f\nAverage time per packet: %f\n", lastFrameNumber, 200, runTime, runTime/200.0);
+
+    }
+
+    return 1;
+
 
    /*{
     signal(SIGALRM,alarmHandler);

@@ -7,7 +7,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
 
     LinkLayerRole tr;
 
-    int statistics = 0;
+    int statistics = 1;
 
     if(strcmp (role, "tx") == 0){
         tr = LlTx;
@@ -25,6 +25,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
         return;
     }
 
+    clock_t start, end;
+
+    start = clock();
     //segmento testado e funcional (a excecao de llwrite)
     if(tr == LlTx){
 
@@ -125,7 +128,10 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
         }
     }
     
-    llclose(&statistics, ll);
+    end = clock();
+    float duration = ((float)end - start)/CLOCKS_PER_SEC;
+
+    llclose(&statistics, ll, duration);
     
     
     return;
