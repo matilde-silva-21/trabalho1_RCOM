@@ -129,7 +129,7 @@ int llopen(LinkLayer connectionParameters)
         { 
             if(readByte){
                 int bytes = read(fd, buf, 1); //ler byte a byte
-                if(bytes==0) continue;
+                if(bytes==0 || bytes == -1) continue;
             }
         
             
@@ -346,6 +346,8 @@ int llwrite(const unsigned char *buf, int bufSize)
 int llread(unsigned char *packet, int *sizeOfPacket)
 {   
     /*codigo testado e a funcionar como pretendido*/
+    
+    printf("\n------------------------------LLREAD------------------------------\n\n");
 
     unsigned char infoFrame[600]={0}, supFrame[5]={0}, BCC2=0x00, aux[400] = {0}, flagCount = 0, STOP = FALSE; 
     int control = (!receiverNumber) << 6, index = 0, sizeInfo = 0;
@@ -356,12 +358,14 @@ int llread(unsigned char *packet, int *sizeOfPacket)
     STATE st = STATE0;
     unsigned char readByte = TRUE;
     
+    
     // Loop for input
     while (!STOP)
     { 
         if(readByte){
             int bytes = read(fd, buf, 1); //ler byte a byte
-            if(bytes==0) continue;
+            if(bytes==-1 || bytes == 0) continue;
+            
         }
     
         
@@ -376,6 +380,7 @@ int llread(unsigned char *packet, int *sizeOfPacket)
 
         case STATE1:
             if(buf[0] != 0x7E){
+            
                 st = STATE2;
                 infoFrame[sizeInfo++] = buf[0];
             }
@@ -392,6 +397,7 @@ int llread(unsigned char *packet, int *sizeOfPacket)
                 infoFrame[sizeInfo++] = buf[0];
             }
             else if(buf[0] == 0x7E){
+            
                 STOP = TRUE;
                 infoFrame[sizeInfo++] = buf[0];
                 readByte = FALSE;
@@ -403,8 +409,6 @@ int llread(unsigned char *packet, int *sizeOfPacket)
         }
     }
 
-
-    printf("\n------------------------------LLREAD------------------------------\n\n");
     //1º ler o pipe
     //2º fazer de-stuff aos bytes lidos
     //3º verificar que os BCCs estao certos
@@ -574,6 +578,9 @@ int llclose(int showStatistics, LinkLayer connectionParameters, float runTime)
 
             else if(strcasecmp(buf, parcels) == 0){
                 printf("\nDISC message received. Responding now.\n");
+                
+                buf[1] = 0x01;
+                buf[3] = buf[1]^buf[2];
 
                 while(alarmCount <= nTries){
 
@@ -639,7 +646,9 @@ int llclose(int showStatistics, LinkLayer connectionParameters, float runTime)
             
             int result = read(fd, parcels, 5);
 
-            parcels[6] = '\0';
+            buf[1] = 0x01;
+            buf[3] = buf[1]^buf[2];
+            parcels[5] = '\0';
 
             if(result != -1 && parcels != 0 && parcels[0]==0x7E){
                 //se o DISC estiver errado 

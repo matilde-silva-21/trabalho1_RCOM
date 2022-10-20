@@ -4,15 +4,18 @@
 
 void applicationLayer(const char *serialPort, const char *role, int baudRate, int nTries, int timeout, const char *filename)
 {
-
     LinkLayerRole tr;
+    
+    int resTX = strcmp (role, "tx");
+    int resRX = strcmp (role, "rx");
 
     int statistics = 1;
 
-    if(strcmp (role, "tx") == 0){
+    if(resTX==0){
         tr = LlTx;
     }
-    else {tr = LlRx;}
+    else if(resRX==0){tr = LlRx;}
+    else {printf("\nERROR! Invalid role.\n"); return;}
 
     LinkLayer ll;
     strcpy(ll.serialPort, serialPort);
@@ -21,28 +24,30 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
     ll.timeout = timeout;
     ll.role = tr;
 
-    if(llopen(ll)==-1) {
-        return;
-    }
-
+    if(llopen(ll)==-1) {return;}
+    
     clock_t start, end;
-
+    
     start = clock();
     //segmento testado e funcional (a excecao de llwrite)
     if(tr == LlTx){
-
         unsigned char packet[300], bytes[200], fileNotOver = 1;
         int sizePacket = 0;
+       
 
         FILE *fileptr;
+        
 
         int nBytes = 200, curByte=0, index=0, nSequence = 0;
-
+        
+        
         fileptr = fopen(filename, "rb");        // Open the file in binary mode
         if(fileptr == NULL){
             printf("Couldn't find a file with that name, sorry :(\n");
             return;
         }
+        
+
 
         sizePacket = getControlPacket(filename,1,&packet);
 
@@ -96,20 +101,18 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
         // 3º escrever os dataPacket no ficheiro que criei
         FILE *fileptr;
         char readBytes = 1;
+        
+        
 
         while(readBytes){
+        
             unsigned char packet[600] = {0};
             int sizeOfPacket = 0, index = 0;
+            
             if(llread(&packet, &sizeOfPacket)==-1){
                 continue;
             }
-
-            /*printf("\n-----app layer 111 PACKET-----\n");
-            printf("\nSize of P: %d\nDataPacket: 0x", sizeOfPacket);
-            for(int i=0; i<sizeOfPacket; i++){
-                printf("%02X ", packet[i]);
-            }
-            printf("\n\n");*/
+           
             
             if(packet[0] == 0x03){
                 printf("\nClosed penguin\n");
@@ -118,7 +121,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             }
             else if(packet[0]==0x02){
                 printf("\nOpened penguin\n");
-                fileptr = fopen("penguin-received.gif", "wb");   
+                fileptr = fopen(filename, "wb");   
             }
             else{
                 for(int i=4; i<sizeOfPacket; i++){
