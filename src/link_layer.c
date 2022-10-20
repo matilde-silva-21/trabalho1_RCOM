@@ -268,14 +268,14 @@ int llwrite(const unsigned char *buf, int bufSize)
     infoFrame[index++]=BCC;
     infoFrame[index++]=0x7E;
 
-    /*printf("\n-----LLWrite 270 buffer before de-stuff-----\n");
+    printf("\n-----LLWrite 270 buffer before de-stuff-----\n");
     printf("\nSize of infoFrame: %d\nInfoFrame: 0x", index);
 
     for(int i=0; i<index; i++){
         printf("%02X ", infoFrame[i]);
     }
 
-    printf("\n\n");*/
+    printf("\n\n");
 
     //ate aqui codigo funciona como pretendido
 
@@ -355,7 +355,7 @@ int llread(unsigned char *packet, int *sizeOfPacket)
     supFrame[4] = 0x7E;
 
     if(infoFrame[0]!=0x7E || (infoFrame[1]^infoFrame[2]) != infoFrame[3]){
-        /*printf("\nInfoFrame not received correctly. Sending REJ.\n");
+        printf("\nInfoFrame not received correctly. Protocol error. Sending REJ.\n");
         supFrame[2] = (receiverNumber << 7) | 0x01;
         supFrame[3] = supFrame[1] ^ supFrame[2];
         write(fd, supFrame, 5);
@@ -367,7 +367,7 @@ int llread(unsigned char *packet, int *sizeOfPacket)
             printf("%02X ", supFrame[i]);
         }
 
-        printf("\n\n");*/
+        printf("\n\n");
 
         return -1;
     }
@@ -409,7 +409,7 @@ int llread(unsigned char *packet, int *sizeOfPacket)
 
         if(packet[4]==0x01){
             if(infoFrame[5] == lastFrameNumber){
-                printf("\nInfoFrame received correctly. Sending RR.\n");
+                printf("\nInfoFrame received correctly. Repeated Frame. Sending RR.\n");
                 supFrame[2] = (receiverNumber << 7) | 0x05;
                 supFrame[3] = supFrame[1] ^ supFrame[2];
                 write(fd, supFrame, 5);
@@ -426,19 +426,19 @@ int llread(unsigned char *packet, int *sizeOfPacket)
     }
     
     else {
-        printf("\nInfoFrame not received correctly. Sending REJ.\n");
+        printf("\nInfoFrame not received correctly. Error in data packet. Sending REJ.\n");
         supFrame[2] = (receiverNumber << 7) | 0x01;
         supFrame[3] = supFrame[1] ^ supFrame[2];
         write(fd, supFrame, 5);
 
-        /*printf("\n-----REJ-----\n");
+        printf("\n-----REJ-----\n");
         printf("\nSize of REJ: %d\nREJ: 0x", 5);
 
         for(int i=0; i<5; i++){
             printf("%02X ", supFrame[i]);
         }
 
-        printf("\n\n");*/
+        printf("\n\n");
 
         return -1;
     }
