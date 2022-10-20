@@ -243,7 +243,7 @@ int llwrite(const unsigned char *buf, int bufSize)
     alarmCount = 0;
 
     unsigned char BCC = 0x00, infoFrame[600] = {0}, parcels[5] = {0};
-    int index = 4, STOP = 0, controlReceiver = (receiverNumber << 7) | 0x05, alarmCount = 0;
+    int index = 4, STOP = 0, controlReceiver = (receiverNumber << 7) | 0x05;
 
     //BCC working correctly
     for(int i=0; i<bufSize; i++){
@@ -261,21 +261,37 @@ int llwrite(const unsigned char *buf, int bufSize)
             infoFrame[index++]=0x5e;
             continue;
         }
+        else if(buf[i]==0x7D){
+            infoFrame[index++]=0x7D;
+            infoFrame[index++]=0x5D;
+            continue;
+        }
 
         infoFrame[index++]=buf[i];
     }
 
-    infoFrame[index++]=BCC;
+    if(BCC == 0x7E){
+        infoFrame[index++]=0x7D;
+        infoFrame[index++]=0x5e;
+    }
+
+    else if(BCC == 0x7D){
+        infoFrame[index++]=0x7D;
+        infoFrame[index++]=0x5D;
+    }
+    
+    else {infoFrame[index++]=BCC;}
+
     infoFrame[index++]=0x7E;
 
-    printf("\n-----LLWrite 270 buffer before de-stuff-----\n");
+    /*printf("\n-----LLWrite 270 buffer before de-stuff-----\n");
     printf("\nSize of infoFrame: %d\nInfoFrame: 0x", index);
 
     for(int i=0; i<index; i++){
         printf("%02X ", infoFrame[i]);
     }
 
-    printf("\n\n");
+    printf("\n\n");*/
 
     //ate aqui codigo funciona como pretendido
 
@@ -288,7 +304,6 @@ int llwrite(const unsigned char *buf, int bufSize)
         
         
         int result = read(fd, parcels, 5);
-        
 
         if(result != -1 && parcels != 0){
             /*alarmEnabled = FALSE;
@@ -307,7 +322,7 @@ int llwrite(const unsigned char *buf, int bufSize)
             }
         }
 
-        else if(alarmCount > nTries){
+        if(alarmCount > nTries){
             printf("\nllwrite error: Exceeded number of tries when sending frame\n");
             STOP = 1;
             close(fd);
@@ -332,12 +347,60 @@ int llread(unsigned char *packet, int *sizeOfPacket)
 {   
     /*codigo testado e a funcionar como pretendido*/
 
-    unsigned char infoFrame[600]={0}, supFrame[5]={0}, BCC2=0x00, aux[400] = {0};
+    unsigned char infoFrame[600]={0}, supFrame[5]={0}, BCC2=0x00, aux[400] = {0}, flagCount = 0, STOP = FALSE; 
+    int control = (!receiverNumber) << 6, index = 0, sizeInfo = 0;
 
-    int result = read(fd, infoFrame, 600), index = 0, control = (!receiverNumber) << 6;
+    
+    unsigned char buf[1] = {0}; // +1: Save space for the final '\0' char
 
-    if(result == -1){
-        return -1;
+    STATE st = STATE0;
+    unsigned char readByte = TRUE;
+    
+    // Loop for input
+    while (!STOP)
+    { 
+        if(readByte){
+            int bytes = read(fd, buf, 1); //ler byte a byte
+            if(bytes==0) continue;
+        }
+    
+        
+        switch (st)
+        {
+        case STATE0:
+            if(buf[0] == 0x7E){
+                st = STATE1;
+                infoFrame[sizeInfo++] = buf[0];
+            }
+            break;
+
+        case STATE1:
+            if(buf[0] != 0x7E){
+                st = STATE2;
+                infoFrame[sizeInfo++] = buf[0];
+            }
+            else{
+                memset(infoFrame, 0, 600);
+                st = STATE1;
+                sizeInfo = 0;
+                infoFrame[sizeInfo++] = buf[0];
+            }
+            break;
+
+        case STATE2:
+            if(buf[0] != 0x7E){
+                infoFrame[sizeInfo++] = buf[0];
+            }
+            else if(buf[0] == 0x7E){
+                STOP = TRUE;
+                infoFrame[sizeInfo++] = buf[0];
+                readByte = FALSE;
+            }
+            break;
+        
+        default:
+            break;
+        }
     }
 
 
@@ -354,7 +417,7 @@ int llread(unsigned char *packet, int *sizeOfPacket)
     
     supFrame[4] = 0x7E;
 
-    if(infoFrame[0]!=0x7E || (infoFrame[1]^infoFrame[2]) != infoFrame[3]){
+    if((infoFrame[1]^infoFrame[2]) != infoFrame[3]){
         printf("\nInfoFrame not received correctly. Protocol error. Sending REJ.\n");
         supFrame[2] = (receiverNumber << 7) | 0x01;
         supFrame[3] = supFrame[1] ^ supFrame[2];
@@ -372,19 +435,27 @@ int llread(unsigned char *packet, int *sizeOfPacket)
         return -1;
     }
 
+    /*printf("\n-----llread 422 infoFrame-----\n");
+    printf("\nSize of P: %d\nInfoFrame: 0x", sizeInfo);
+    for(int i=0; i<sizeInfo; i++){
+        printf("%02X ", infoFrame[i]);
+    }
+    printf("\n\n");*/
 
 
-
-    for(int i=0; i<600-1; i++){
+    for(int i=0; i<sizeInfo; i++){
         if(infoFrame[i] == 0x7D && infoFrame[i+1]==0x5e){
             packet[index++] = 0x7E;
             i++;
         }
+
+        else if(infoFrame[i] == 0x7D && infoFrame[i+1]==0x5d){
+            packet[index++] = 0x7D;
+            i++;
+        }
+
         else {packet[index++] = infoFrame[i];}
     }
-
-
-
 
     int size = 0; //tamanho da secçao de dados
 
@@ -431,14 +502,14 @@ int llread(unsigned char *packet, int *sizeOfPacket)
         supFrame[3] = supFrame[1] ^ supFrame[2];
         write(fd, supFrame, 5);
 
-        printf("\n-----REJ-----\n");
+        /*printf("\n-----REJ-----\n");
         printf("\nSize of REJ: %d\nREJ: 0x", 5);
 
         for(int i=0; i<5; i++){
             printf("%02X ", supFrame[i]);
         }
 
-        printf("\n\n");
+        printf("\n\n");*/
 
         return -1;
     }
@@ -466,9 +537,6 @@ int llread(unsigned char *packet, int *sizeOfPacket)
     }
     else {receiverNumber = 1;}
 
-    
-
-
     return 1;
 }
 
@@ -477,13 +545,14 @@ int llread(unsigned char *packet, int *sizeOfPacket)
 ////////////////////////////////////////////////
 int llclose(int showStatistics, LinkLayer connectionParameters, float runTime)
 {       
+    alarmCount = 0;
 
     printf("\n------------------------------LLCLOSE------------------------------\n\n");
 
     if(connectionParameters.role == LlRx){
 
         unsigned char buf[6] = {0}, parcels[6] = {0};
-        unsigned char STOP = 0;
+        unsigned char STOP = 0, UA = 0;
 
         buf[0] = 0x7E;
         buf[1] = 0x03;
@@ -506,15 +575,39 @@ int llclose(int showStatistics, LinkLayer connectionParameters, float runTime)
             else if(strcasecmp(buf, parcels) == 0){
                 printf("\nDISC message received. Responding now.\n");
 
-                printf("\nDISC message sent, %d bytes written\n", 5);
+                while(alarmCount <= nTries){
 
-                write(fd, buf, 5);
+                    if(!alarmEnabled){
+                        printf("\nDISC message sent, %d bytes written\n", 5);
+                        write(fd, buf, 5);
+                        startAlarm(timeout);
+                    }
+                    
+                    int result = read(fd, parcels, 5);
+                    if(result != -1 && parcels != 0 && parcels[0]==0x7E){
+                        //se o UA estiver errado 
+                        if(parcels[2] != 0x07 || (parcels[3] != (parcels[1]^parcels[2]))){
+                            printf("\nUA not correct: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
+                            alarmEnabled = FALSE;
+                            continue;
+                        }
+                        
+                        else{   
+                            printf("\nUA correctly received: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
+                            alarmEnabled = FALSE;
+                            close(fd);
+                            break;
+                        }
+                    }
+
+                }
+
+                if(alarmCount > nTries){
+                    printf("\nAlarm limit reached, DISC message not sent\n");
+                    return -1;
+                }
+                
                 STOP = TRUE;
-            }
-            
-            else {
-                printf("\nDISC message incorrect: 0x%02X %02X %02X %02X %02X\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
-                continue;
             }
         
         }
@@ -559,9 +652,10 @@ int llclose(int showStatistics, LinkLayer connectionParameters, float runTime)
                 else{   
                     printf("\nDISC correctly received: 0x%02x%02x%02x%02x%02x\n", parcels[0], parcels[1], parcels[2], parcels[3], parcels[4]);
                     alarmEnabled = FALSE;
-
+                    
+                    buf[1] = 0x01;
                     buf[2] = 0x07;
-                    buf[3] = buf[2]^buf[3];
+                    buf[3] = buf[1]^buf[2];
 
                     int bytes = write(fd, buf, 5);
 

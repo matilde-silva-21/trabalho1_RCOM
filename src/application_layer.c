@@ -104,13 +104,13 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
                 continue;
             }
 
-            printf("\n-----app layer 111 PACKET-----\n");
+            /*printf("\n-----app layer 111 PACKET-----\n");
             printf("\nSize of P: %d\nDataPacket: 0x", sizeOfPacket);
             for(int i=0; i<sizeOfPacket; i++){
                 printf("%02X ", packet[i]);
             }
-            printf("\n\n");
-
+            printf("\n\n");*/
+            
             if(packet[0] == 0x03){
                 printf("\nClosed penguin\n");
                 fclose(fileptr);
