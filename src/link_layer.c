@@ -364,7 +364,7 @@ int llread(unsigned char *packet, int *sizeOfPacket)
     { 
         if(readByte){
             int bytes = read(fd, buf, 1); //ler byte a byte
-            if(bytes==-1 || bytes == 0) continue;
+            if(bytes==-1 || bytes == 0) continue; // se der erro a leitura ou se tiver lido 0 bytes continuo para a próxima iteraçao
             
         }
     
@@ -372,18 +372,24 @@ int llread(unsigned char *packet, int *sizeOfPacket)
         switch (st)
         {
         case STATE0:
+            //state0 porque a primeira coisa que quero receber é a FLAG. quando tenho confirmaçao que recebi a flag passo ao proximo estado.
             if(buf[0] == 0x7E){
                 st = STATE1;
                 infoFrame[sizeInfo++] = buf[0];
             }
+            //se nao receber a flag significa que estou a ler um byte aleatorio que eu nao quero
             break;
 
         case STATE1:
+            //no STATE1 eu quero receber qualquer coisa exceto a flag, porque pode dar-se o caso que eu leio 2 FLAGS seguidas (a de fim de uma trama e a de inicio de outra)
+            // ou seja, EU NAO QUERO EM QUALQUER CASO LER 0X7E DUAS VEZES SEGUIDINHAS porque isso significa que esta a ler duas tramas diferentes
+            //por isso este estado serve só para receber um byte logo a seguir a flag, que seja diferente de 0x7E, assim que isso acontecer passo para STATE2
             if(buf[0] != 0x7E){
             
                 st = STATE2;
                 infoFrame[sizeInfo++] = buf[0];
             }
+            //Se eu ler duas FLAGS seguidas sei que a flag que acabei de ler é o inico de uma nova tram de info por isso posso cortar o primeiro passo de receber a flag e continuar no STATE1 em que a proxima coisa que vem depois de uma flag é qualquer numero EXCETO a flag
             else{
                 memset(infoFrame, 0, 600);
                 st = STATE1;
@@ -393,9 +399,11 @@ int llread(unsigned char *packet, int *sizeOfPacket)
             break;
 
         case STATE2:
+            //no state2 eu ja garanti que estou a ler uma unica trama de informaçao e nao o cu e a cabeça de duas diferentes, por isso continuo no STATE2 até recebr uma flag (ou seja ate acabar a trama de info)
             if(buf[0] != 0x7E){
                 infoFrame[sizeInfo++] = buf[0];
             }
+            //quando receber a flag significa que a trama de info acabou e por isso posso sair da stateMachine e comecou a verificar se aquilo que recebi nao foi corrompido ou algo do genero
             else if(buf[0] == 0x7E){
             
                 STOP = TRUE;

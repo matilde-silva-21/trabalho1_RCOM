@@ -49,9 +49,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
         
 
 
-        sizePacket = getControlPacket(filename,1,&packet);
+        sizePacket = getControlPacket(filename,1,&packet);}
 
-        if(llwrite(packet, sizePacket) == -1){
+        /*if(llwrite(packet, sizePacket) == -1){
             return;
         }
 
@@ -130,7 +130,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             }
         }
     }
-    
+   */ 
     end = clock();
     float duration = ((float)end - start)/CLOCKS_PER_SEC;
 
@@ -151,13 +151,15 @@ int getControlPacket(char* filename, int start, unsigned char* packet){
         return -1;
     }
 
-	char hex_string[20];
+	unsigned char hex_string[20];
 
     struct stat file;
     stat(filename, &file);
     sprintf(hex_string, "%02lX", file.st_size);
 	
-	int index = 3, fileSizeBytes = strlen(hex_string);
+	int index = 3, fileSizeBytes = strlen(hex_string) / 2, fileSize = file.st_size;
+
+    printf("\nfilesize: %d\n hex_string: %s", file.st_size, hex_string);
 
     if(fileSizeBytes > 256){
         printf("size of file couldn't fit in one byte\n");
@@ -175,9 +177,8 @@ int getControlPacket(char* filename, int start, unsigned char* packet){
     packet[2] = fileSizeBytes;
 
 
-
-	for(int i=0; i<strlen(hex_string); i++){
-		packet[index++] = hex_string[i];
+	for(int i=(fileSizeBytes-1); i>-1; i--){
+		packet[index++] = fileSize >> (8*i);
 	}
     
 
