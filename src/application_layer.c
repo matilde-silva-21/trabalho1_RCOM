@@ -49,9 +49,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
         
 
 
-        sizePacket = getControlPacket(filename,1,&packet);}
+        sizePacket = getControlPacket(filename,1,&packet);
 
-        /*if(llwrite(packet, sizePacket) == -1){
+        if(llwrite(packet, sizePacket) == -1){
             return;
         }
 
@@ -130,7 +130,6 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate, in
             }
         }
     }
-   */ 
     end = clock();
     float duration = ((float)end - start)/CLOCKS_PER_SEC;
 
