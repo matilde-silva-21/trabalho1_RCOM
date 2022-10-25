@@ -243,7 +243,7 @@ int llwrite(const unsigned char *buf, int bufSize)
     alarmCount = 0;
 
     unsigned char BCC = 0x00, infoFrame[600] = {0}, parcels[5] = {0};
-    int index = 4, STOP = 0, controlReceiver = (receiverNumber << 7) | 0x05;
+    int index = 4, STOP = 0, controlReceiver = (!senderNumber << 7) | 0x05;
 
     //BCC working correctly
     for(int i=0; i<bufSize; i++){
@@ -429,7 +429,7 @@ int llread(unsigned char *packet, int *sizeOfPacket)
     
     supFrame[4] = 0x7E;
 
-    if((infoFrame[1]^infoFrame[2]) != infoFrame[3]){
+    if((infoFrame[1]^infoFrame[2]) != infoFrame[3] || infoFrame[2] != control){
         printf("\nInfoFrame not received correctly. Protocol error. Sending REJ.\n");
         supFrame[2] = (receiverNumber << 7) | 0x01;
         supFrame[3] = supFrame[1] ^ supFrame[2];
