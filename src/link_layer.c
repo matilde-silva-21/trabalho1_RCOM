@@ -85,7 +85,7 @@ int llopen(LinkLayer connectionParameters)
         buf[4] = 0x7E;
 
 
-        while(alarmCount <= nTries){
+        while(alarmCount < nTries){
 
             if(!alarmEnabled){
                 int bytes = write(fd, buf, sizeof(buf));
@@ -111,7 +111,7 @@ int llopen(LinkLayer connectionParameters)
 
         }
 
-        if(alarmCount > nTries){
+        if(alarmCount >= nTries){
             printf("\nAlarm limit reached, SET message not sent\n");
             return -1;
         }
@@ -322,7 +322,7 @@ int llwrite(const unsigned char *buf, int bufSize)
             }
         }
 
-        if(alarmCount > nTries){
+        if(alarmCount >= nTries){
             printf("\nllwrite error: Exceeded number of tries when sending frame\n");
             STOP = 1;
             close(fd);
@@ -590,7 +590,7 @@ int llclose(int showStatistics, LinkLayer connectionParameters, float runTime)
                 buf[1] = 0x01;
                 buf[3] = buf[1]^buf[2];
 
-                while(alarmCount <= nTries){
+                while(alarmCount < nTries){
 
                     if(!alarmEnabled){
                         printf("\nDISC message sent, %d bytes written\n", 5);
@@ -617,7 +617,7 @@ int llclose(int showStatistics, LinkLayer connectionParameters, float runTime)
 
                 }
 
-                if(alarmCount > nTries){
+                if(alarmCount >= nTries){
                     printf("\nAlarm limit reached, DISC message not sent\n");
                     return -1;
                 }
@@ -641,7 +641,7 @@ int llclose(int showStatistics, LinkLayer connectionParameters, float runTime)
         buf[4] = 0x7E;
         buf[5] = '\0'; //assim posso usar o strcmp
 
-        while(alarmCount <= nTries){
+        while(alarmCount < nTries){
 
             if(!alarmEnabled){
                 
@@ -686,7 +686,7 @@ int llclose(int showStatistics, LinkLayer connectionParameters, float runTime)
 
         }
 
-        if(alarmCount > nTries){
+        if(alarmCount >= nTries){
             printf("\nAlarm limit reached, DISC message not sent\n");
             close(fd);
             return -1;
